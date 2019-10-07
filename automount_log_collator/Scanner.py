@@ -31,24 +31,7 @@ class Scanner(object):
         self._config = Config(args)
         self._collator = Collator(self._config)
 
-    def _get_last_collation(self):
-        timestampRE = re.compile(r"""^(\d\d\d\d)(\d\d)(\d\d)$""")
-        try:
-            with open(self._config.last_collation_file) as f:
-                m = timestampRE.match(f.read())
-                if m:
-                    return pendulum.DateTime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=pendulum.now().timezone)
-            return None
-        except (IOError, ValueError):
-            return None
-
-    def _set_last_collation(self, t0):
-        with open(self._config.last_collation_file, 'w') as f:
-            f.write('%s\n' % timestamp_str(t0))
-
     def scan(self):
-        last_collation_dt = self._get_last_collation()
-
         # important to process logfiles in order, so timestamps are preserved
         for entry in sorted(os.listdir(self._config.logdir)):
             automountLogRE = re.compile(r"""^automount(-(\d\d\d\d)(\d\d)(\d\d).gz)?$""")
@@ -64,13 +47,11 @@ class Scanner(object):
                 else:
                     compressed = False
                     logfile_dt = pendulum.from_timestamp(os.path.getmtime(entryPath), tz=pendulum.now().timezone_name)
-                if last_collation_dt is None or last_collation_dt < logfile_dt:
+                if self._collator.pending(logfile_dt):
                     reader = Reader(entryPath, compressed, logfile_dt)
                     if self._args.verbose:
                         sys.stdout.write('collating %s\n' % entry)
                     reader.collate_to(self._collator)
-                    last_collation_dt = logfile_dt
-                    self._set_last_collation(last_collation_dt)
                 else:
                     if self._args.verbose:
                         sys.stdout.write('skipping %s\n' % entry)
