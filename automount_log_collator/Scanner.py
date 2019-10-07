@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import gzip
 import os
 import os.path
 import pendulum
@@ -21,7 +22,6 @@ import sys
 
 from .Collator import Collator
 from .Config import Config
-from .Reader import Reader
 from .util import timestamp_str
 
 class Scanner(object):
@@ -31,28 +31,67 @@ class Scanner(object):
         self._config = Config(args)
         self._collator = Collator(self._config, self._args.verbose)
 
+    def _collate_if_pending(self, logpath, logfile_dt, compressed):
+        # skip processing of files we've already seen
+        if not self._collator.pending(logfile_dt):
+            if self._args.verbose:
+                sys.stdout.write('skipping %s\n' % logpath)
+            return
+
+        if self._args.verbose:
+            sys.stdout.write('collating %s\n' % logpath)
+
+        loglineRE = re.compile(r"""^(\S+\s+\d+\s+\d+:\d+:\d+)\s+\S+\s+\S+\s+(\S+)\s+(.*)$""")
+        if compressed:
+            logf = gzip.open(logpath, 'r')
+        else:
+            logf = open(logpath, 'r')
+        loglineno = 0
+        try:
+            for logline in logf:
+                try:
+                    loglineno += 1
+                    m = loglineRE.match(logline)
+                    if m:
+                        # infer the year for the timestamp, which is usually the same as the logfile year,
+                        # except when we roll over from Dec to Jan
+                        timestamp_s = m.group(1)
+                        timestamp_year = logfile_dt.year - 1 if timestamp_s.startswith('Dec') and logfile_dt.month == 1 else logfile_dt.year
+                        timestamp = pendulum.parse('%d %s' % (timestamp_year, timestamp_s), tz=pendulum.now().timezone, strict=False)
+                        action = m.group(2)
+                        path = m.group(3)
+                        if path.startswith('/'):
+                            if action == 'mounted':
+                                self._collator.mount(timestamp, path)
+                            elif action == 'expired':
+                                self._collator.unmount(timestamp, path)
+                    else:
+                        sys.stderr.write('warning: ignoring badly formatted line at %s:%d\n' % (logpath, loglineno))
+                except UnicodeDecodeError:
+                    sys.stderr.write('warning: ignoring badly encoded line at %s:%d\n' % (logpath, loglineno))
+        except:
+            sys.stderr.write('failed at %s:%d\n' % (logpath, loglineno))
+            raise
+        finally:
+            logf.close()
+
     def scan(self):
-        # important to process logfiles in order, so timestamps are preserved
+        # important to process log-rotated logfiles in order, so timestamps are preserved
         for entry in sorted(os.listdir(self._config.logdir)):
-            automountLogRE = re.compile(r"""^automount(-(\d\d\d\d)(\d\d)(\d\d).gz)?$""")
+            automountLogRE = re.compile(r"""^automount-(\d\d\d\d)(\d\d)(\d\d).gz$""")
             m = automountLogRE.match(entry)
             if m:
-                entryPath = os.path.join(self._config.logdir, entry)
-                if m.group(1):
-                    compressed = True
-                    logfile_year = int(m.group(2))
-                    logfile_month = int(m.group(3))
-                    logfile_day = int(m.group(4))
-                    logfile_dt = pendulum.DateTime(logfile_year, logfile_month, logfile_day, tzinfo=pendulum.now().timezone)
-                else:
-                    compressed = False
-                    logfile_dt = pendulum.from_timestamp(os.path.getmtime(entryPath), tz=pendulum.now().timezone_name)
-                if self._collator.pending(logfile_dt):
-                    reader = Reader(entryPath, compressed, logfile_dt)
-                    if self._args.verbose:
-                        sys.stdout.write('collating %s\n' % entry)
-                    reader.collate_to(self._collator)
-                else:
-                    if self._args.verbose:
-                        sys.stdout.write('skipping %s\n' % entry)
+                logpath = os.path.join(self._config.logdir, entry)
+                logfile_year = int(m.group(1))
+                logfile_month = int(m.group(2))
+                logfile_day = int(m.group(3))
+                logfile_dt = pendulum.DateTime(logfile_year, logfile_month, logfile_day, tzinfo=pendulum.now().timezone)
+                self._collate_if_pending(logpath, logfile_dt, compressed=True)
+
+        # finally look at the uncompressed logfile
+        logpath = os.path.join(self._config.logdir, 'automount')
+        if os.path.exists(logpath):
+            logfile_dt = pendulum.from_timestamp(os.path.getmtime(logpath), tz=pendulum.now().timezone_name)
+            self._collate_if_pending(logpath, logfile_dt, compressed=False)
+
         self._collator.finalize()
