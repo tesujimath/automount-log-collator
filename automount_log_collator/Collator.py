@@ -110,8 +110,8 @@ class Collator(object):
 
     def _resolve_active_mount(self, path):
         # remove that mount is active, and return its timestamp
-        if self._verbose:
-            sys.stdout.write('remove active mount %s\n' % path)
+        #if self._verbose:
+        #    sys.stdout.write('remove active mount %s\n' % path)
         t0 = self._mounts[path]
         del self._mounts[path]
         if path in self._persisted_mounts:

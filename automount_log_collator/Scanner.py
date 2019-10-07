@@ -43,7 +43,7 @@ class Scanner(object):
 
         loglineRE = re.compile(r"""^(\S+\s+\d+\s+\d+:\d+:\d+)\s+\S+\s+\S+\s+(\S+)\s+(.*)$""")
         if compressed:
-            logf = gzip.open(logpath, 'r')
+            logf = gzip.open(logpath, 'rt')
         else:
             logf = open(logpath, 'r')
         loglineno = 0
