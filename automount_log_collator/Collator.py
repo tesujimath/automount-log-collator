@@ -75,6 +75,7 @@ class Collator(object):
             self.unmount(pendulum.now(), path)
 
         # active mounts
+        now = pendulum.now().int_timestamp
         for path, t0 in self._mounts.items():
             filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -82,6 +83,12 @@ class Collator(object):
                 f.write('%s\n' % timestamp_str(t0))
                 if self._verbose:
                     sys.stdout.write('save mount %s at %s\n' % (path, t0))
+            # set timestamp of collated file to now, to indicate that it is still in use
+            cpath = os.path.join(self._config.localhost_collation_dir(), path[1:])
+            if not os.path.exists(cpath):
+                # create empty file, so we can touch it
+                open(cpath, 'a').close()
+            os.utime(cpath, (now, now))
 
     def _outpath(self, path):
         return os.path.normpath(os.path.join(self._config.localhost_collation_dir(), path[1:]))
