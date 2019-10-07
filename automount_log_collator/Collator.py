@@ -17,8 +17,9 @@ import os
 import os.path
 import pendulum
 import re
+import sys
 
-from .util import bare_hostname, duration_str, timestamp_str, timestamp_from_str
+from .util import bare_hostname, duration_str, timestamp_str, timestamp_from_str, purge_empty_dirs
 
 class Collator(object):
     def __init__(self, config):
@@ -27,6 +28,8 @@ class Collator(object):
         self._last_collation = None
         self._last_path = None
         self._mounts = {}
+        self._persisted_mounts = {} # for mounts which were saved in filesystem
+        self._dirty = False     # whether we need to cleanup persisted mount directories
         self._load()
 
     def _load(self):
@@ -39,11 +42,19 @@ class Collator(object):
             pass
 
         # active mounts
-        cdir = self._config.localhost_collation_dir()
+        cdir = self._config.localhost_collation_dir(active=True)
         cdir_len = len(cdir)
         for root, dirs, files in os.walk(cdir):
             for filename in files:
-                fpath = os.path.join(root, filename)[cdir_len:]
+                # read actual file, and path for mount, and its timestamp
+                filepath = os.path.join(root, filename)
+                path = filepath[cdir_len:]
+                with open(filepath, 'r') as f:
+                    for line in f:
+                        t0 = timestamp_from_str(line)
+                        self._mounts[path] = t0
+                        self._persisted_mounts[path] = True
+                        print('load mount %s at %s' % (path, t0))
 
     def _save(self):
         # last collation timestamp
@@ -52,10 +63,11 @@ class Collator(object):
 
         # active mounts
         for path, t0 in self._mounts.items():
-            fpath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
-            os.makedirs(os.path.dirname(fpath), exist_ok=True)
-            with open(fpath, 'w') as f:
+            filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w') as f:
                 f.write('%s\n' % timestamp_str(t0))
+                print('save mount %s at %s' % (path, t0))
 
     def _outpath(self, path):
         return os.path.normpath(os.path.join(self._config.localhost_collation_dir(), path[1:]))
@@ -74,12 +86,25 @@ class Collator(object):
             self._mounts[path] = t0
             self._seen(t0)
 
+    def _resolve_active_mount(self, path):
+        # remove that mount is active, and return its timestamp
+        print('remove active mount %s' % path)
+        t0 = self._mounts[path]
+        del self._mounts[path]
+        if path in self._persisted_mounts:
+            del self._persisted_mounts[path]
+            filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
+            if os.path.exists(filepath):
+                print('remove active mount file %s' % path)
+                os.remove(filepath)
+                self._dirty = True
+        return t0
+
     def unmount(self, t1, path):
         if self.pending(t1):
             print('expire %s at %s' % (path, timestamp_str(t1)))
             if path in self._mounts:
-                t0 = self._mounts[path]
-                del self._mounts[path]
+                t0 = self._resolve_active_mount(path)
                 d = duration_str(t0, t1)
                 outpath = self._outpath(path)
                 if not os.path.exists(outpath):
@@ -89,7 +114,7 @@ class Collator(object):
                 t = t1.int_timestamp
                 os.utime(outpath, (t, t))
             else:
-                sys.stderr.write('warning: no mount found for unmount %s at %s\n', (path, timestamp_str(t1)))
+                sys.stderr.write('warning: no mount found for unmount %s at %s\n' % (path, timestamp_str(t1)))
             self._seen(t1)
 
     def finalize(self):
@@ -98,3 +123,6 @@ class Collator(object):
             if self._last_collation is None or self._last_path > self._last_collation:
                 self._last_collation = self._last_path
         self._save()
+        # remove any empty directories among the persisted mounts, if we deleted anything
+        if self._dirty:
+            purge_empty_dirs(self._config.localhost_collation_dir(active=True))

@@ -52,3 +52,17 @@ def timestamp_str(t0):
 
 def timestamp_from_str(s):
     return pendulum.from_format(s, 'YYYYMMDD-HH:mm:ss', tz=pendulum.now().timezone)
+
+def rmdir_if_empty(dirpath):
+    try:
+        os.rmdir(dirpath)
+        print('rmdir %s' % dirpath)
+    except OSError:
+        # non-empty, didn't want to delete it anyway
+        pass
+
+def purge_empty_dirs(rootdir):
+    for root, dirs, files in os.walk(rootdir, topdown=False):
+        for dirname in dirs:
+            rmdir_if_empty(os.path.join(root, dirname))
+    rmdir_if_empty(rootdir)

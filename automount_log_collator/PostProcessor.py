@@ -39,16 +39,6 @@ class PostProcessor(object):
                         paths[path] = set()
                     paths[path].add(host)
 
-    def _purge_empty_dirs(self):
-        for root, dirs, files in os.walk(self._config.localhost_collation_dir(), topdown=False):
-            for dirname in dirs:
-                dirpath = os.path.join(root, dirname)
-                try:
-                    os.rmdir(dirpath)
-                    print('rmdir %s ' % dirpath)
-                except:
-                    pass
-
     @staticmethod
     def timestamp(line):
         """Return just the timestamp from a line in a collated file."""
