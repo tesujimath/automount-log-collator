@@ -1,3 +1,4 @@
 log-dir = "~/junk/automount-log"  # usually "/var/log"
 collation-dir = "~/junk/automount-log/collated"
+active-collation-dir = "~/junk/automount-log/collated.active"
 consolidation-dir = "~/junk/automount-log/consolidated"

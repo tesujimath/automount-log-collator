@@ -18,7 +18,7 @@ import pytoml as toml
 import re
 import sys
 
-from .util import bare_hostname
+from .util import bare_hostname, merge_lists
 
 def expand(s):
     return os.path.expanduser(os.path.expandvars(s))
@@ -63,11 +63,15 @@ class Config(object):
         if 'class' in self._config and 'all' in self._config['class']:
             raise ConfigError(self._filename, 'invalid class "all"')
 
-    def localhost_collation_dir(self):
-        return os.path.join(expand(self._config['collation-dir']), bare_hostname())
+    def _collation_config(self, active=False):
+        """Return the config attribute for collation, active or not."""
+        return self._config['active-collation-dir' if active else 'collation-dir']
 
-    def host_collation_dir(self, hostname):
-        return os.path.join(expand(self._config['collation-dir']), hostname)
+    def localhost_collation_dir(self, active=False):
+        return os.path.join(expand(self._collation_config(active)), bare_hostname())
+
+    def host_collation_dir(self, hostname, active=False):
+        return os.path.join(expand(self._collation_config(active)), hostname)
 
     def consolidation_dir(self, host=None):
         subdir = 'ALL' if host is None else host
@@ -75,11 +79,13 @@ class Config(object):
 
     @property
     def last_collation_file(self):
-        return os.path.join(expand(self._config['collation-dir']), '.%s.collated' % bare_hostname())
+        return os.path.join(expand(self._collation_config()), '.%s.collated' % bare_hostname())
 
     @property
     def logdir(self):
         return expand(self._config['log-dir'])
 
     def collated_hosts(self):
-        return os.listdir(expand(self._config['collation-dir']))
+        return merge_lists(
+            os.listdir(expand(self._collation_config(True))),
+            os.listdir(expand(self._collation_config(False))))

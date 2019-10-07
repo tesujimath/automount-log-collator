@@ -22,6 +22,7 @@ import sys
 from .Collator import Collator
 from .Config import Config
 from .Reader import Reader
+from .util import timestamp_str
 
 class Scanner(object):
 
@@ -41,9 +42,9 @@ class Scanner(object):
         except (IOError, ValueError):
             return None
 
-    def _set_last_collation(self, dt):
+    def _set_last_collation(self, t0):
         with open(self._config.last_collation_file, 'w') as f:
-            f.write('%s\n' % dt.strftime('%Y%m%d'))
+            f.write('%s\n' % timestamp_str(t0))
 
     def scan(self):
         last_collation_dt = self._get_last_collation()
@@ -73,3 +74,4 @@ class Scanner(object):
                 else:
                     if self._args.verbose:
                         sys.stdout.write('skipping %s\n' % entry)
+        self._collator.finalize()

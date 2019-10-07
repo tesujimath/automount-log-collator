@@ -21,7 +21,7 @@ import sys
 from .Config import Config
 from .KeyedReader import KeyedReader
 from .KeyedReaderTree import KeyedReaderTree
-from .util import bare_hostname, append_and_set_timestamp
+from .util import bare_hostname, append_and_set_timestamp, timestamp_from_str
 
 class PostProcessor(object):
 
@@ -52,7 +52,7 @@ class PostProcessor(object):
     @staticmethod
     def timestamp(line):
         """Return just the timestamp from a line in a collated file."""
-        return pendulum.from_format(line.split(maxsplit=1)[0], 'YYYYMMDD-HH:mm:ss', tz=pendulum.now().timezone)
+        return timestamp_from_str(line.split(maxsplit=1)[0])
 
     def consolidate(self):
         hosts = self._config.collated_hosts()
