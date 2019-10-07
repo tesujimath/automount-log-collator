@@ -61,6 +61,15 @@ class Collator(object):
         with open(self._config.last_collation_file, 'w') as f:
             f.write('%s\n' % timestamp_str(self._last_collation))
 
+        # ensure we don't persist an active mount which is not in fact mounted
+        bogus_mounts = {}
+        for path in self._mounts:
+            if not os.path.ismount(path):
+                bogus_mounts[path] = True
+        for path in bogus_mounts:
+            print('bogus mount %s, discarding' % path)
+            self.unmount(pendulum.now(), path)
+
         # active mounts
         for path, t0 in self._mounts.items():
             filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
