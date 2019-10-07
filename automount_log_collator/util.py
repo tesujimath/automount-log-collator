@@ -56,7 +56,6 @@ def timestamp_from_str(s):
 def rmdir_if_empty(dirpath):
     try:
         os.rmdir(dirpath)
-        print('rmdir %s' % dirpath)
     except OSError:
         # non-empty, didn't want to delete it anyway
         pass

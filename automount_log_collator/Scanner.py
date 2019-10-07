@@ -29,7 +29,7 @@ class Scanner(object):
     def __init__(self, args):
         self._args = args
         self._config = Config(args)
-        self._collator = Collator(self._config)
+        self._collator = Collator(self._config, self._args.verbose)
 
     def scan(self):
         # important to process logfiles in order, so timestamps are preserved
