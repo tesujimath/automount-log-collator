@@ -5,7 +5,9 @@
 # logrotate after the event, splitting according to whole years.
 
 import datetime
+import gzip
 import os.path
+import shutil
 import sys
 
 class Rotator:
@@ -51,6 +53,7 @@ class Rotator:
     def _open_outfile(self):
         self._close_outfile()
         self._outf = open('%s.%d' % (self._logbase, self._year), 'w')
+        print('writing to %s.%d' % (self._logbase, self._year))
 
     def _close_outfile(self):
         if self._outf is not None:
@@ -66,10 +69,14 @@ class Rotator:
 
         current_year = datetime.date.today().year
         for i in range(self._year):
-            os.rename('%s.%d' % (self._logbase, i),
-                      '%s-%d1231' % (self._logbase, current_year + i - self._year))
-            os.rename('%s.%d' % (self._logbase, self._year),
-                      self._logbase)
+            print('compressing %s.%d as %s-%d1231.gz' % (self._logbase, i, self._logbase, current_year + i - self._year))
+            with open('%s.%d' % (self._logbase, i)) as inf:
+                with gzip.open('%s-%d1231.gz' % (self._logbase, current_year + i - self._year), 'wt') as outf:
+                    shutil.copyfileobj(inf, outf)
+            os.remove('%s.%d' % (self._logbase, i))
+        print('renaming %s.%d as %s' % (self._logbase, self._year, self._logbase))
+        os.rename('%s.%d' % (self._logbase, self._year),
+                  self._logbase)
 
 def main():
     usage = 'usage: %s count-years|rotate <logfile>' % os.path.basename(sys.argv[0])
