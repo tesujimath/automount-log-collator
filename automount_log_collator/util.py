@@ -65,3 +65,20 @@ def purge_empty_dirs(rootdir):
         for dirname in dirs:
             rmdir_if_empty(os.path.join(root, dirname))
     rmdir_if_empty(rootdir)
+
+def path_splitall(path):
+    xs = []
+    head = path
+    while head != os.sep and head != '':
+        head, tail = os.path.split(head)
+        if tail != '':
+            xs.insert(0, tail)
+    return xs
+
+def escape_path(path, abspath=False):
+    tail = os.path.join(*['_' + x for x in path_splitall(path)])
+    return os.sep + tail if abspath and path.startswith(os.sep) else tail
+
+def unescape_path(path, abspath=True):
+    tail = os.path.join(*[x[1:] if x.startswith('_') else x for x in path_splitall(path)])
+    return os.sep + tail if abspath and path.startswith(os.sep) else tail

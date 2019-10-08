@@ -19,7 +19,8 @@ import pendulum
 import re
 import sys
 
-from .util import bare_hostname, duration_str, timestamp_str, timestamp_from_str, purge_empty_dirs
+from .util import ( bare_hostname, duration_str, timestamp_str, timestamp_from_str, purge_empty_dirs,
+                    escape_path, unescape_path )
 
 class Collator(object):
     def __init__(self, config, verbose):
@@ -33,6 +34,18 @@ class Collator(object):
         self._dirty = False     # whether we need to cleanup persisted mount directories
         self._load()
 
+    def _history_path(self, path):
+        """Return the path to the mount history file."""
+        return os.path.join(self._config.localhost_collation_dir(), escape_path(path), 'history')
+
+    def _active_path(self, path):
+        """Return the path to the active mount file."""
+        return os.path.join(self._config.localhost_collation_dir(), escape_path(path), 'active')
+
+    def _path_from_mounts_filepath(self, filepath):
+        """Return the path represented by the active or history file."""
+        return os.path.dirname(unescape_path(filepath[len(self._config.localhost_collation_dir()):]))
+
     def _load(self):
         # last collation timestamp
         try:
@@ -44,13 +57,13 @@ class Collator(object):
             pass
 
         # active mounts
-        cdir = self._config.localhost_collation_dir(active=True)
-        cdir_len = len(cdir)
-        for root, dirs, files in os.walk(cdir):
-            for filename in files:
+        for root, dirs, files in os.walk(self._config.localhost_collation_dir()):
+            if 'active' in files:
                 # read actual file, and path for mount, and its timestamp
-                filepath = os.path.join(root, filename)
-                path = filepath[cdir_len:]
+                filepath = os.path.join(root, 'active')
+                path = self._path_from_mounts_filepath(filepath)
+                #if self._verbose:
+                #    sys.stdout.write('path from %s is %s\n' % (filepath, path))
                 with open(filepath, 'r') as f:
                     for line in f:
                         t0 = timestamp_from_str(line)
@@ -77,21 +90,18 @@ class Collator(object):
         # active mounts
         now = pendulum.now().int_timestamp
         for path, t0 in self._mounts.items():
-            filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            with open(filepath, 'w') as f:
+            active_path = self._active_path(path)
+            os.makedirs(os.path.dirname(active_path), exist_ok=True)
+            with open(active_path, 'w') as f:
                 f.write('%s\n' % timestamp_str(t0))
                 if self._verbose:
                     sys.stdout.write('save mount %s at %s\n' % (path, t0))
             # set timestamp of collated file to now, to indicate that it is still in use
-            cpath = os.path.join(self._config.localhost_collation_dir(), path[1:])
-            if not os.path.exists(cpath):
+            history_path = self._history_path(path)
+            if not os.path.exists(history_path):
                 # create empty file, so we can touch it
-                open(cpath, 'a').close()
-            os.utime(cpath, (now, now))
-
-    def _outpath(self, path):
-        return os.path.normpath(os.path.join(self._config.localhost_collation_dir(), path[1:]))
+                open(history_path, 'a').close()
+            os.utime(history_path, (now, now))
 
     def pending(self, t0):
         """Return whether records at time t0 are still to be processed"""
@@ -116,11 +126,11 @@ class Collator(object):
         del self._mounts[path]
         if path in self._persisted_mounts:
             del self._persisted_mounts[path]
-            filepath = os.path.join(self._config.localhost_collation_dir(active=True), path[1:])
-            if os.path.exists(filepath):
+            active_path = self._active_path(path)
+            if os.path.exists(active_path):
                 if self._verbose:
                     sys.stdout.write('remove active mount file %s\n' % path)
-                os.remove(filepath)
+                os.remove(active_path)
                 self._dirty = True
         return t0
 
@@ -131,13 +141,13 @@ class Collator(object):
             if path in self._mounts:
                 t0 = self._resolve_active_mount(path)
                 d = duration_str(t0, t1)
-                outpath = self._outpath(path)
-                if not os.path.exists(outpath):
-                    os.makedirs(os.path.dirname(outpath), exist_ok=True)
-                with open(outpath, 'a') as outf:
+                history_path = self._history_path(path)
+                if not os.path.exists(history_path):
+                    os.makedirs(os.path.dirname(history_path), exist_ok=True)
+                with open(history_path, 'a') as outf:
                     outf.write('%s %s %s %s\n' % (timestamp_str(t1), self._hostname, path, d))
                 t = t1.int_timestamp
-                os.utime(outpath, (t, t))
+                os.utime(history_path, (t, t))
             else:
                 sys.stderr.write('warning: no mount found for unmount %s at %s\n' % (path, timestamp_str(t1)))
             self._seen(t1)
@@ -150,4 +160,4 @@ class Collator(object):
         self._save()
         # remove any empty directories among the persisted mounts, if we deleted anything
         if self._dirty:
-            purge_empty_dirs(self._config.localhost_collation_dir(active=True))
+            purge_empty_dirs(self._config.localhost_collation_dir())
