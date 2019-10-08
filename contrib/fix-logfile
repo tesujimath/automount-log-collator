@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+#
+# this script may be necessary if the automount logfile hasn't been rotated,
+# and contains entries from multiple years. This simply does the
+# logrotate after the event, splitting according to whole years.
+
+import datetime
+import os.path
+import sys
+
+class Rotator:
+    def __init__(self, logbase):
+        self._logbase = logbase
+        self._monthnums = {
+                'Jan': 1,
+                'Feb': 2,
+                'Mar': 3,
+                'Apr': 4,
+                'May': 5,
+                'Jun': 6,
+                'Jul': 7,
+                'Aug': 8,
+                'Sep': 9,
+                'Oct': 10,
+                'Nov': 11,
+                'Dec': 12,
+            }
+        self._year = 0
+        self._inf = open(self._logbase, 'r')
+        self._outf = None
+        self._line = None
+
+    def _lines(self):
+        lastseen = 0
+        for line in self._inf:
+            self._line = line
+            mstr = line.split()[0]
+            m = self._monthnums[mstr]
+            if m < lastseen:
+                self._year += 1
+                yield True
+            else:
+                yield False
+            lastseen = m
+
+    def count(self):
+        for newyear in self._lines():
+            pass
+        return self._year + 1
+
+    def _open_outfile(self):
+        self._close_outfile()
+        self._outf = open('%s.%d' % (self._logbase, self._year), 'w')
+
+    def _close_outfile(self):
+        if self._outf is not None:
+            self._outf.close()
+
+    def rotate(self):
+        self._open_outfile()
+        for newyear in self._lines():
+            if newyear:
+                self._open_outfile()
+            self._outf.write(self._line)
+        self._close_outfile()
+
+        current_year = datetime.date.today().year
+        for i in range(self._year):
+            os.rename('%s.%d' % (self._logbase, i),
+                      '%s-%d1231' % (self._logbase, current_year + i - self._year))
+            os.rename('%s.%d' % (self._logbase, self._year),
+                      self._logbase)
+
+def main():
+    usage = 'usage: %s count-years|rotate <logfile>' % os.path.basename(sys.argv[0])
+    if len(sys.argv) < 3:
+        sys.stderr.write('%s\n' % usage)
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    r = Rotator(sys.argv[2])
+    if cmd == 'count-years':
+        print('%d' % r.count())
+    elif cmd == 'rotate':
+        r.rotate()
+    else:
+        sys.stderr.write('%s\n' % usage)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
