@@ -63,15 +63,16 @@ class Config(object):
         if 'class' in self._config and 'all' in self._config['class']:
             raise ConfigError(self._filename, 'invalid class "all"')
 
-    def localhost_collation_dir(self):
-        return os.path.join(expand(self._config['collation-dir']), bare_hostname())
+    def collation_dir(self):
+        return expand(self._config['collation-dir'])
 
-    def host_collation_dir(self, hostname):
-        return os.path.join(expand(self._config['collation-dir']), hostname)
+    def host_collation_dir(self, host=None):
+        if host == None:
+            host = bare_hostname()
+        return os.path.join(expand(self._config['collation-dir']), host)
 
-    def consolidation_dir(self, host=None):
-        subdir = 'ALL' if host is None else host
-        return os.path.join(expand(self._config['consolidation-dir']), subdir)
+    def consolidation_dir(self):
+        return expand(self._config['consolidation-dir'])
 
     @property
     def last_collation_file(self):
@@ -80,6 +81,3 @@ class Config(object):
     @property
     def logdir(self):
         return expand(self._config['log-dir'])
-
-    def collated_hosts(self):
-        return [ x for x in os.listdir(expand(self._config['collation-dir'])) if not x.startswith('.') ]

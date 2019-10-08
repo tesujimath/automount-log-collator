@@ -19,7 +19,7 @@ import argparse
 import sys
 
 from automount_log_collator.Config import ConfigError
-from automount_log_collator.PostProcessor import PostProcessor
+from automount_log_collator.Merger import Merger
 from automount_log_collator.Scanner import Scanner
 from automount_log_collator.version import get_version
 
@@ -35,8 +35,8 @@ def main():
         if args.command == 'version':
             print('automount-log-collator v%s' % get_version())
         elif args.command == 'consolidate':
-            p = PostProcessor(args)
-            p.consolidate()
+            merger = Merger(args)
+            merger.merge()
         elif args.command == 'collate':
             scanner = Scanner(args)
             scanner.scan()

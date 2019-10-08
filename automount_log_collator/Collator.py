@@ -34,17 +34,25 @@ class Collator(object):
         self._dirty = False     # whether we need to cleanup persisted mount directories
         self._load()
 
+    def host_history_path(self, host, path):
+        """Return the path to the mount history file."""
+        return os.path.join(self._config.host_collation_dir(host), escape_path(path), 'history')
+
     def _history_path(self, path):
         """Return the path to the mount history file."""
-        return os.path.join(self._config.localhost_collation_dir(), escape_path(path), 'history')
+        return self.host_history_path(None, path)
+
+    def host_active_path(self, host, path):
+        """Return the path to the active mount file."""
+        return os.path.join(self._config.host_collation_dir(host), escape_path(path), 'active')
 
     def _active_path(self, path):
         """Return the path to the active mount file."""
-        return os.path.join(self._config.localhost_collation_dir(), escape_path(path), 'active')
+        return self.host_active_path(None, path)
 
     def _path_from_mounts_filepath(self, filepath):
         """Return the path represented by the active or history file."""
-        return os.path.dirname(unescape_path(filepath[len(self._config.localhost_collation_dir()):]))
+        return os.path.dirname(unescape_path(filepath[len(self._config.host_collation_dir()):]))
 
     def _load(self):
         # last collation timestamp
@@ -57,7 +65,7 @@ class Collator(object):
             pass
 
         # active mounts
-        for root, dirs, files in os.walk(self._config.localhost_collation_dir()):
+        for root, dirs, files in os.walk(self._config.host_collation_dir()):
             if 'active' in files:
                 # read actual file, and path for mount, and its timestamp
                 filepath = os.path.join(root, 'active')
@@ -152,6 +160,9 @@ class Collator(object):
                 sys.stderr.write('warning: no mount found for unmount %s at %s\n' % (path, timestamp_str(t1)))
             self._seen(t1)
 
+    def purge_empty_dirs(self, host=None):
+        purge_empty_dirs(self._config.host_collation_dir(host))
+
     def finalize(self):
         """Write out all the current mounts"""
         if self._last_path is not None:
@@ -160,4 +171,16 @@ class Collator(object):
         self._save()
         # remove any empty directories among the persisted mounts, if we deleted anything
         if self._dirty:
-            purge_empty_dirs(self._config.localhost_collation_dir())
+            self.purge_empty_dirs()
+
+    def hosts(self):
+        """Return list of hosts which have collations."""
+        return [ x for x in os.listdir(self._config.collation_dir())
+                 if not x.startswith('.') ]
+
+    def paths(self, host):
+        """Return collated paths for host."""
+        for root, dirs, files in os.walk(self._config.host_collation_dir(host)):
+            if 'active' in files or 'history' in files:
+                filepath = os.path.join(root, 'history')
+                yield self._path_from_mounts_filepath(filepath)

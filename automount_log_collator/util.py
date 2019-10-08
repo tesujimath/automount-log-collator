@@ -15,6 +15,7 @@
 
 import os
 import pendulum
+import sys
 
 def bare_hostname():
     """Hostname without domain."""
@@ -82,3 +83,21 @@ def escape_path(path, abspath=False):
 def unescape_path(path, abspath=True):
     tail = os.path.join(*[x[1:] if x.startswith('_') else x for x in path_splitall(path)])
     return os.sep + tail if abspath and path.startswith(os.sep) else tail
+
+def relativize_path(path):
+    return path[1:] if path.startswith(os.sep) else path
+
+def force_makedirs(path, exist_ok=True, verbose=False):
+    """If there's a file in the way, delete it."""
+    done = False
+    while not done:
+        try:
+            os.makedirs(path, exist_ok=exist_ok)
+            done = True
+        except FileExistsError as e:
+            if os.path.isfile(e.filename):
+                if verbose:
+                    sys.stdout.write('removing file %s to create directory %s\n' % (e.filename, path))
+                os.remove(e.filename)
+            else:
+                done = True
