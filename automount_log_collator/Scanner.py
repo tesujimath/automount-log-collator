@@ -41,7 +41,7 @@ class Scanner(object):
         if self._args.verbose:
             sys.stdout.write('collating %s\n' % logpath)
 
-        loglineRE = re.compile(r"""^(\S+\s+\d+\s+\d+:\d+:\d+)\s+\S+\s+\S+\s+(\S+)\s+(.*)$""")
+        loglineRE = re.compile(r"""^(\S+\s+\d+\s+\d+:\d+:\d+)\s+\S+\s+\S+\s+(\S+)\s+(/\S*)$""")
         if compressed:
             logf = gzip.open(logpath, 'rt')
         else:
@@ -60,13 +60,10 @@ class Scanner(object):
                         timestamp = pendulum.parse('%d %s' % (timestamp_year, timestamp_s), tz=pendulum.now().timezone, strict=False)
                         action = m.group(2)
                         path = m.group(3)
-                        if path.startswith('/'):
-                            if action == 'mounted':
-                                self._collator.mount(timestamp, path)
-                            elif action == 'expired':
-                                self._collator.unmount(timestamp, path)
-                    else:
-                        sys.stderr.write('warning: ignoring badly formatted line at %s:%d\n' % (logpath, loglineno))
+                        if action == 'mounted':
+                            self._collator.mount(timestamp, path)
+                        elif action == 'expired':
+                            self._collator.unmount(timestamp, path)
                 except UnicodeDecodeError:
                     sys.stderr.write('warning: ignoring badly encoded line at %s:%d\n' % (logpath, loglineno))
         except:
