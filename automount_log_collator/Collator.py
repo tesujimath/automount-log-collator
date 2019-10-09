@@ -157,7 +157,7 @@ class Collator(object):
             if not os.path.exists(history_path):
                 os.makedirs(os.path.dirname(history_path), exist_ok=True)
             with open(history_path, 'a') as outf:
-                outf.write('%s %s %s %s\n' % (timestamp_str(t1), self._hostname, path, d))
+                outf.write('%s %s %s\n' % (timestamp_str(t1), self._hostname, d))
             t = t1.int_timestamp
             os.utime(history_path, (t, t))
 
