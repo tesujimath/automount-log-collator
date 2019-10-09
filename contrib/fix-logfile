@@ -28,22 +28,26 @@ class Rotator:
                 'Dec': 12,
             }
         self._year = 0
-        self._inf = open(self._logbase, 'r')
         self._outf = None
         self._line = None
+        try:
+            self._inf = open(self._logbase, 'r')
+        except:
+            self._inf = None
 
     def _lines(self):
-        lastseen = 0
-        for line in self._inf:
-            self._line = line
-            mstr = line.split()[0]
-            m = self._monthnums[mstr]
-            if m < lastseen:
-                self._year += 1
-                yield True
-            else:
-                yield False
-            lastseen = m
+        if self._inf is not None:
+            lastseen = 0
+            for line in self._inf:
+                self._line = line
+                mstr = line.split()[0]
+                m = self._monthnums[mstr]
+                if m < lastseen:
+                    self._year += 1
+                    yield True
+                else:
+                    yield False
+                lastseen = m
 
     def count(self):
         for newyear in self._lines():

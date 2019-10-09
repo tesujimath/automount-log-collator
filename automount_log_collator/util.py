@@ -95,9 +95,18 @@ def force_makedirs(path, exist_ok=True, verbose=False):
             os.makedirs(path, exist_ok=exist_ok)
             done = True
         except FileExistsError as e:
+            # last component is a file
             if os.path.isfile(e.filename):
                 if verbose:
                     sys.stdout.write('removing file %s to create directory %s\n' % (e.filename, path))
                 os.remove(e.filename)
             else:
-                done = True
+                raise
+        except NotADirectoryError as e:
+            # some parent is a file, so look back up to find it, and remove it
+            badpath = e.filename
+            while not os.path.isfile(badpath):
+                badpath = os.path.dirname(badpath)
+            if verbose:
+                sys.stdout.write('removing file %s to create directory %s\n' % (e.filename, path))
+            os.remove(badpath)

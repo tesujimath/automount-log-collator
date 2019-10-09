@@ -50,9 +50,9 @@ class Collator(object):
         """Return the path to the active mount file."""
         return self.host_active_path(None, path)
 
-    def _path_from_mounts_filepath(self, filepath):
+    def _path_from_mounts_filepath(self, filepath, host=None):
         """Return the path represented by the active or history file."""
-        return os.path.dirname(unescape_path(filepath[len(self._config.host_collation_dir()):]))
+        return os.path.dirname(unescape_path(filepath[len(self._config.host_collation_dir(host)):]))
 
     def _load(self):
         # last collation timestamp
@@ -149,15 +149,18 @@ class Collator(object):
             if path in self._mounts:
                 t0 = self._resolve_active_mount(path)
                 d = duration_str(t0, t1)
-                history_path = self._history_path(path)
-                if not os.path.exists(history_path):
-                    os.makedirs(os.path.dirname(history_path), exist_ok=True)
-                with open(history_path, 'a') as outf:
-                    outf.write('%s %s %s %s\n' % (timestamp_str(t1), self._hostname, path, d))
-                t = t1.int_timestamp
-                os.utime(history_path, (t, t))
             else:
-                sys.stderr.write('warning: no mount found for unmount %s at %s\n' % (path, timestamp_str(t1)))
+                d = 'unknown'
+                if self._verbose:
+                    sys.stderr.write('warning: no mount found for unmount %s at %s\n' % (path, timestamp_str(t1)))
+            history_path = self._history_path(path)
+            if not os.path.exists(history_path):
+                os.makedirs(os.path.dirname(history_path), exist_ok=True)
+            with open(history_path, 'a') as outf:
+                outf.write('%s %s %s %s\n' % (timestamp_str(t1), self._hostname, path, d))
+            t = t1.int_timestamp
+            os.utime(history_path, (t, t))
+
             self._seen(t1)
 
     def purge_empty_dirs(self, host=None):
@@ -168,7 +171,7 @@ class Collator(object):
         if self._last_path is not None:
             if self._last_collation is None or self._last_path > self._last_collation:
                 self._last_collation = self._last_path
-        self._save()
+            self._save()
         # remove any empty directories among the persisted mounts, if we deleted anything
         if self._dirty:
             self.purge_empty_dirs()
@@ -183,4 +186,4 @@ class Collator(object):
         for root, dirs, files in os.walk(self._config.host_collation_dir(host)):
             if 'active' in files or 'history' in files:
                 filepath = os.path.join(root, 'history')
-                yield self._path_from_mounts_filepath(filepath)
+                yield self._path_from_mounts_filepath(filepath, host)

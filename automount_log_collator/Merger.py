@@ -54,12 +54,12 @@ class Merger(object):
                 all_paths[path].append(host)
         for path, hosts in all_paths.items():
             krt = KeyedReaderTree()
-            history_paths = [ self._collator.host_history_path(host, path) for host in hosts ]
             outpath = os.path.join(self._config.consolidation_dir(), relativize_path(path))
-            for history_path in history_paths:
-                if self._verbose:
-                    sys.stdout.write('history_path %s\n' % history_path)
-                krt.insert(KeyedReader(history_path, self.__class__.timestamp))
+            for history_path in [ self._collator.host_history_path(host, path) for host in hosts ]:
+                if os.path.exists(history_path):
+                    if self._verbose:
+                        sys.stdout.write('history_path %s\n' % history_path)
+                    krt.insert(KeyedReader(history_path, self.__class__.timestamp))
             if os.path.exists(outpath):
                 krt.insert(KeyedReader(outpath, self.__class__.timestamp))
             force_makedirs(os.path.dirname(outpath), exist_ok=True, verbose=self._verbose)
