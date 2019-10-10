@@ -56,27 +56,28 @@ class Merger(object):
             krt = KeyedReaderTree()
             outpath = os.path.join(self._config.consolidation_dir(), relativize_path(path))
             for history_path in [ self._collator.host_history_path(host, path) for host in hosts ]:
-                if os.path.exists(history_path):
+                if os.path.isfile(history_path):
                     if self._verbose:
                         sys.stdout.write('history_path %s\n' % history_path)
                     krt.insert(KeyedReader(history_path, self.__class__.timestamp))
-            if os.path.exists(outpath):
+            if os.path.isfile(outpath):
                 krt.insert(KeyedReader(outpath, self.__class__.timestamp))
-            force_makedirs(os.path.dirname(outpath), exist_ok=True, verbose=self._verbose)
-            outpathnew = '%s.new' % outpath
-            with open(outpathnew, 'w') as f:
-                for line in krt.lines():
-                    f.write(line)
-            os.rename(outpathnew, outpath)
-            # set the timestamp according to the last key, or the active path if that exists
-            t0 = krt.lastkey.int_timestamp if krt.lastkey is not None else None
-            for host in hosts:
-                active_path = self._collator.host_active_path(host, path)
-                if os.path.exists(active_path):
-                    t = os.stat(active_path).st_mtime
-                    if t0 is None or t > t0:
-                        t0 = t
-            os.utime(outpath, (t0, t0))
+            if krt.n > 0:
+                force_makedirs(os.path.dirname(outpath), exist_ok=True, verbose=self._verbose)
+                outpathnew = '%s.new' % outpath
+                with open(outpathnew, 'w') as f:
+                    for line in krt.lines():
+                        f.write(line)
+                os.rename(outpathnew, outpath)
+                # set the timestamp according to the last key, or the active path if that exists
+                t0 = krt.lastkey.int_timestamp if krt.lastkey is not None else None
+                for host in hosts:
+                    active_path = self._collator.host_active_path(host, path)
+                    if os.path.exists(active_path):
+                        t = os.stat(active_path).st_mtime
+                        if t0 is None or t > t0:
+                            t0 = t
+                os.utime(outpath, (t0, t0))
         self._finalize_consolidated()
 
     def _finalize_consolidated(self):
