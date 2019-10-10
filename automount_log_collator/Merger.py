@@ -69,15 +69,15 @@ class Merger(object):
                     for line in krt.lines():
                         f.write(line)
                 os.rename(outpathnew, outpath)
-                # set the timestamp according to the last key, or the active path if that exists
-                t0 = krt.lastkey.int_timestamp if krt.lastkey is not None else None
-                for host in hosts:
-                    active_path = self._collator.host_active_path(host, path)
-                    if os.path.exists(active_path):
-                        t = os.stat(active_path).st_mtime
-                        if t0 is None or t > t0:
-                            t0 = t
-                os.utime(outpath, (t0, t0))
+            # set the timestamp according to the last key, or the active path if that exists
+            t0 = krt.lastkey.int_timestamp if krt.lastkey is not None else None
+            for host in hosts:
+                active_path = self._collator.host_active_path(host, path)
+                if os.path.exists(active_path):
+                    t = os.stat(active_path).st_mtime
+                    if t0 is None or t > t0:
+                        t0 = t
+            os.utime(outpath, (t0, t0))
         self._finalize_consolidated()
 
     def _finalize_consolidated(self):
