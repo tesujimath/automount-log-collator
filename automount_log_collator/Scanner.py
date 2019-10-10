@@ -35,7 +35,7 @@ class Scanner(object):
         # skip processing of files we've already seen
         if not self._collator.pending(logfile_dt):
             if self._args.verbose:
-                sys.stdout.write('skipping %s\n' % logpath)
+                sys.stdout.write('skipping %s, timestamp %s\n' % (logpath, timestamp_str(logfile_dt)))
             return
 
         if self._args.verbose:
@@ -60,10 +60,11 @@ class Scanner(object):
                         timestamp = pendulum.parse('%d %s' % (timestamp_year, timestamp_s), tz=pendulum.now().timezone, strict=False)
                         action = m.group(2)
                         path = m.group(3)
-                        if action == 'mounted':
-                            self._collator.mount(timestamp, path)
-                        elif action == 'expired':
-                            self._collator.unmount(timestamp, path)
+                        if self._collator.pending(logfile_dt):
+                            if action == 'mounted':
+                                self._collator.mount(timestamp, path)
+                            elif action == 'expired':
+                                self._collator.unmount(timestamp, path)
                 except UnicodeDecodeError:
                     sys.stderr.write('warning: ignoring badly encoded line at %s:%d\n' % (logpath, loglineno))
         except:
